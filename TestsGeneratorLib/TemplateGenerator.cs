@@ -1,0 +1,124 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+
+namespace TestsGeneratorLib
+{
+    public class TemplateGenerator
+    {
+        public List<TestInfo> MakeTemplates(List<ClassInfo> parsedClasses)
+        {
+            string content, fileName;
+            var res = new List<TestInfo>();
+
+            foreach (ClassInfo classInfo in parsedClasses)
+            {
+                CompilationUnitSyntax cus = CompilationUnit()
+                    .WithUsings(GetUsingDecl(classInfo))
+                    .WithMembers(SingletonList<MemberDeclarationSyntax>(GetNamespaceDecl(classInfo)
+                        .WithMembers(SingletonList<MemberDeclarationSyntax>(ClassDeclaration(classInfo.ClassName + "Tests")
+                            .WithAttributeLists(
+                                SingletonList<AttributeListSyntax>(
+                                    AttributeList(
+                                        SingletonSeparatedList<AttributeSyntax>(
+                                            Attribute(
+                                                IdentifierName("TestClass"))))))
+                                                    .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword)))
+                                                        .WithMembers(GetMembersDecl(classInfo))))));
+
+                fileName = classInfo.ClassName + "Test.cs";
+                content = cus.NormalizeWhitespace().ToFullString();
+                res.Add(new TestInfo(fileName, content));
+            }
+
+            return res;
+        }
+
+        private NamespaceDeclarationSyntax GetNamespaceDecl(ClassInfo classInfo)
+        {
+            NamespaceDeclarationSyntax namespaceDecl = NamespaceDeclaration(QualifiedName(
+                IdentifierName(classInfo.ClassNamespace), IdentifierName("Tests")));
+            return namespaceDecl;
+        }
+
+        private SyntaxList<UsingDirectiveSyntax> GetUsingDecl(ClassInfo classInfo)
+        {
+            var usings = new List<UsingDirectiveSyntax>()
+            {
+                UsingDirective(IdentifierName("System")),
+                UsingDirective(IdentifierName("System.Collections.Generic")),
+                UsingDirective(IdentifierName("System.Linq")),
+                UsingDirective(IdentifierName("System.Text")),
+                UsingDirective(IdentifierName("Microsoft.VisualStudio.TestTools.UnitTesting")),
+                UsingDirective(IdentifierName(classInfo.ClassNamespace))
+            };
+
+            return new SyntaxList<UsingDirectiveSyntax>(usings);
+        }
+
+        private SyntaxList<MemberDeclarationSyntax> GetMembersDecl(ClassInfo classInfo)
+        {
+            var methods = new List<MemberDeclarationSyntax>();
+
+            foreach (string methodName in classInfo.ClassMethods)
+            {
+                methods.Add(GetMethodDeclaration(methodName));
+            }
+
+            return new SyntaxList<MemberDeclarationSyntax>(methods);
+        }
+
+        private MethodDeclarationSyntax GetMethodDeclaration(string method)
+        {
+            MethodDeclarationSyntax methodDecl;
+            var bodyMembers = new List<StatementSyntax>();
+
+            bodyMembers.Add(
+                ExpressionStatement(
+                    InvocationExpression(
+                        GetAssertFail())
+                    .WithArgumentList(GetMemberArgs())));
+
+            methodDecl = MethodDeclaration(
+                PredefinedType(
+                    Token(SyntaxKind.VoidKeyword)),
+                Identifier(method + "Test"))
+                .WithAttributeLists(
+                    SingletonList<AttributeListSyntax>(
+                        AttributeList(
+                            SingletonSeparatedList<AttributeSyntax>(
+                                Attribute(
+                                    IdentifierName("TestMethod"))))))
+                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword)))
+                .WithBody(Block(bodyMembers));
+
+            return methodDecl;
+        }
+
+        private MemberAccessExpressionSyntax GetAssertFail()
+        {
+            MemberAccessExpressionSyntax fail = MemberAccessExpression(
+                SyntaxKind.SimpleMemberAccessExpression,
+                IdentifierName("Assert"),
+                IdentifierName("Fail"));
+            return fail;
+        }
+
+        private ArgumentListSyntax GetMemberArgs()
+        {
+            ArgumentListSyntax arguments = ArgumentList(
+                SingletonSeparatedList(
+                    Argument(
+                        LiteralExpression(
+                            SyntaxKind.StringLiteralExpression,
+                            Literal("autogenerated")))));
+            return arguments;
+        }
+    }
+}
