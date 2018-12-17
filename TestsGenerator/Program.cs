@@ -4,8 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+using TestsGeneratorLib;
 
-namespace TestsGenerator
+namespace TestsGeneratorApp
 {
     class Program
     {
@@ -36,7 +37,7 @@ namespace TestsGenerator
 
             try
             {
-                string[] fileEntries = Directory.GetFiles(targetDirectory);
+                string[] fileEntries = Directory.GetFiles(sourceDirectory);
                 foreach (string fileName in fileEntries)
                 {
                     inputFiles.Add(fileName);
@@ -55,7 +56,7 @@ namespace TestsGenerator
             var config = new Config(countOfReadThreads, countOfProcessThreads, countOfWriteThreads);
 
             var generator = new TestsGenerator(config);
-            generator.Generate(sourceFiles, outputPath).Wait();
+            generator.Generate(inputFiles, targetDirectory).Wait();
 
             Console.WriteLine("Generation ended");
             Console.ReadKey();
